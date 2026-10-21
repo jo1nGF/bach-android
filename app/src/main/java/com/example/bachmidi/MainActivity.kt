@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.midi.MidiDevice
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
-import android.media.midi.MidiOutputPort
+import android.media.midi.MidiInputPort
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -46,7 +46,7 @@ private val Muted = Color(0xFF9A9386)
 class MainActivity : ComponentActivity() {
     private lateinit var midiManager: MidiManager
     private var midiDevice: MidiDevice? = null
-    private var output: MidiOutputPort? = null
+    private var output: MidiInputPort? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
         midiDevice?.close()
         midiManager.openDevice(info, { device ->
             midiDevice = device
-            output = device?.openOutputPort(0)
+            output = device?.openInputPort(0)
         }, Handler(Looper.getMainLooper()))
     }
 
@@ -73,9 +73,11 @@ class MainActivity : ComponentActivity() {
         val port = output ?: return
         val n = note.coerceIn(0, 127)
         val v = velocity.coerceIn(1, 127)
-        port.send(byteArrayOf(0x90.toByte(), n.toByte(), v.toByte()))
+        val on = byteArrayOf(0x90.toByte(), n.toByte(), v.toByte())
+        val off = byteArrayOf(0x80.toByte(), n.toByte(), 0)
+        try { port.send(on, 0, on.size) } catch (_: Exception) { return }
         Handler(Looper.getMainLooper()).postDelayed({
-            try { port.send(byteArrayOf(0x80.toByte(), n.toByte(), 0)) } catch (_: Exception) {}
+            try { port.send(off, 0, off.size) } catch (_: Exception) {}
         }, 130)
     }
 
@@ -104,7 +106,7 @@ private fun BachApp(
     ) }
 
     LaunchedEffect(Unit) {
-        devices = midiManager.devices.filter { it.outputPortCount > 0 }
+        devices = midiManager.devices.filter { it.inputPortCount > 0 }
     }
     LaunchedEffect(playing, bpm, engine, breakMode, selected) {
         if (!playing) return@LaunchedEffect
